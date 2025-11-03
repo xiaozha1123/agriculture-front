@@ -12,8 +12,85 @@ const router = createRouter({
     },
     {
       path:'/test',
-      name:'test',
       component: TestPage
+    },
+    {
+      path:'/customer',
+      component: () => import('@/views/customer/LayoutPage.vue'),
+      children:[
+        {
+          path:'',
+          component: () => import('@/views/customer/HomeLogin.vue')
+        },
+        {
+          path:'cart',
+          component: () => import('@/views/customer/CartPage.vue')
+        },
+        {
+          path:'orders',
+          component: () => import('@/views/customer/OrderPage.vue')
+        },
+        {
+          path:'profile',
+          component: () => import('@/views/customer/ProfileCenter.vue')
+        }
+      ]
+    },
+    {
+      path:'/farmer',
+      component: () => import('@/views/farmer/FarmerHome.vue'),
+      children:[
+        {
+          path:'sale',
+          component: () => import('@/views/farmer/SaleDetail.vue')
+        },
+        {
+          path:'product',
+          component: () => import('@/views/farmer/ProductFarmer.vue')
+        },
+        {
+          path:'order',
+          component: () => import('@/views/farmer/OrderFarmer.vue')
+        },
+        {
+          path:'comment',
+          component: () => import('@/views/farmer/CommentList.vue')
+        },
+        {
+          path:'profile',
+          component: () => import('@/views/farmer/ProfileFarmer.vue')
+        }
+      ]
+    },
+    {
+      path:'/admin',
+      component: () => import('@/views/admin/AdminHome.vue'),
+      children:[
+        {
+          path:'user/list',
+          component: () => import('@/views/admin/UserList.vue')
+        },
+        {
+          path:'product/operation',
+          component: () => import('@/views/admin/ProductAdmin.vue')
+        },
+        {
+          path:'product/category',
+          component: () => import('@/views/admin/CategoryAdmin.vue')
+        },
+        {
+          path:'order',
+          component: () => import('@/views/admin/OrderManagement.vue')
+        },
+        {
+          path:'announcement',
+          component: () => import('@/views/admin/AnnouncementPage.vue')
+        },
+        {
+          path:'review',
+          component: () => import('@/views//admin/SellerReview.vue')
+        }
+      ]
     }
   ],
 })

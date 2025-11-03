@@ -1,246 +1,385 @@
-<!-- eslint-disable vue/no-deprecated-v-on-native-modifier -->
-// ...existing code...
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 
-const keyword = ref('')
+// 假设当前登录用户信息
+const user = ref({
+  username: '张三',
+  avatar: 'https://picsum.photos/seed/avatar/50/50'
+})
 
-const features = [
-  { id: 1, title: '技术支持', desc: '种植/病虫害诊断与解决方案', icon: '🧑‍🌾' },
-  { id: 2, title: '订单对接', desc: '产销对接与物流支持', icon: '📦' },
-  { id: 3, title: '金融服务', desc: '小额贷款与保险咨询', icon: '🏦' },
-  { id: 4, title: '培训与政策', desc: '在线培训、补贴政策解读', icon: '📚' },
-]
+// 搜索关键词
+const search = ref('')
 
-const marketItems = [
-  { id: 1, title: '有机大米 5kg', price: '¥120', img: '' },
-  { id: 2, title: '新鲜蔬菜箱', price: '¥68', img: '' },
-  { id: 3, title: '土鸡蛋 30枚', price: '¥45', img: '' },
-  { id: 4, title: '蜂蜜 500g', price: '¥80', img: '' },
-]
+// 模拟轮播图数据
+const banners = ref([
+  { id: 1, image: 'https://picsum.photos/seed/farm1/1200/400', title: '绿色助农 · 共建美好乡村' },
+  { id: 2, image: 'https://picsum.photos/seed/farm2/1200/400', title: '科技赋能农业现代化' },
+  { id: 3, image: 'https://picsum.photos/seed/farm3/1200/400', title: '优质农品 · 来自田间地头' },
+])
 
-const news = [
-  { id: 1, title: '春季病虫害预防要点', date: '2025-03-12' },
-  { id: 2, title: '农机补贴政策更新解读', date: '2025-02-28' },
-  { id: 3, title: '新品种试种成功案例', date: '2025-01-10' },
-]
+// 模拟分类
+const categories = ref([
+  { id: 0, name: '全部', icon: 'https://img.icons8.com/color/48/select-all.png' },
+  { id: 1, name: '粮油副食', icon: 'https://img.icons8.com/color/48/wheat.png' },
+  { id: 2, name: '新鲜果蔬', icon: 'https://img.icons8.com/color/48/apple.png' },
+  { id: 3, name: '农用工具', icon: 'https://img.icons8.com/color/48/shovel.png' },
+  { id: 4, name: '畜牧产品', icon: 'https://img.icons8.com/color/48/cow.png' },
+  { id: 5, name: '手工特产', icon: 'https://img.icons8.com/color/48/handmade.png' },
+])
 
-function handleSearch() {
-  if (!keyword.value.trim()) return
-  // 示例：跳转到搜索结果页，实际路由按项目调整
-  router.push({ name: 'Search', query: { q: keyword.value } }).catch(()=>{})
+// 模拟商品数据
+const products = ref([
+  { id: 1, name: '生态大米', price: 56.8, image: 'https://picsum.photos/seed/rice/280/200', category: '粮油副食' },
+  { id: 2, name: '有机苹果', price: 29.9, image: 'https://picsum.photos/seed/apple/280/200', category: '新鲜果蔬' },
+  { id: 3, name: '绿色蔬菜', price: 8.5, image: 'https://picsum.photos/seed/veg/280/200', category: '新鲜果蔬' },
+  { id: 4, name: '纯天然蜂蜜', price: 69.0, image: 'https://picsum.photos/seed/honey/280/200', category: '手工特产' },
+  { id: 5, name: '优质玉米', price: 18.5, image: 'https://picsum.photos/seed/corn/280/200', category: '粮油副食' },
+  { id: 6, name: '农用铁锹', price: 89.9, image: 'https://picsum.photos/seed/shovel/280/200', category: '农用工具' },
+  { id: 7, name: '牧场牛奶', price: 12.8, image: 'https://picsum.photos/seed/milk/280/200', category: '畜牧产品' },
+])
+
+// 当前分类
+const activeCategory = ref('全部')
+
+// 购物车数据
+const cartCount = ref(0)
+const cartItems = ref<Product[]>([])
+
+// 分类筛选
+const filteredProducts = computed(() => {
+  if (activeCategory.value === '全部') return products.value
+  return products.value.filter(p => p.category === activeCategory.value)
+})
+
+// 分类点击
+const handleCategoryClick = (name: string) => {
+  activeCategory.value = name
 }
 
-function openService(id: number) {
-  // 示例跳转或打开弹窗
-  console.log('打开服务', id)
-  // router.push({ name: 'Service', params: { id } })
+// 搜索
+const handleSearch = () => {
+  if (!search.value.trim()) return
+  router.push({ name: 'Search', query: { q: search.value } })
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function viewProduct(item: any) {
-  console.log('查看商品', item)
-  // router.push({ name: 'Product', params: { id: item.id } })
+// 加入购物车
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function viewNews(item: any) {
-  console.log('查看资讯', item)
-  // router.push({ name: 'NewsDetail', params: { id: item.id } })
+const addToCart = (item: Product) => {
+  cartCount.value++
+  cartItems.value.push(item)
+  ElMessage.success(`已加入购物车：${item.name}`)
+}
+
+// 跳转函数
+const goToCart = () => router.push('/customer/cart')
+const goToOrders = () => router.push('/customer/orders')
+const goToProfile = () => router.push('/customer/profile')
+const logout = () => {
+  ElMessage.success('退出成功')
+  router.push({ name: 'Login' })
 }
 </script>
 
 <template>
-  <div class="home">
+  <div class="layout">
     <el-container>
-      <el-header class="site-header">
-        <div class="header-inner">
-          <div class="logo">助农服务平台</div>
-          <div class="header-actions">
-            <el-input
-              v-model="keyword"
-              placeholder="输入作物 / 服务关键词搜索"
-              clearable
-              @keyup="handleSearch"
-              class="search-input"
-            >
-              <template #append>
-                <el-button type="primary" @click="handleSearch">搜索</el-button>
-              </template>
-            </el-input>
-            <el-button type="text" @click="$router.push({ name: 'Login' })">登录</el-button>
-          </div>
+
+      <!-- 顶部导航 -->
+      <el-header class="header">
+        <div class="header-left">
+          <img src="https://img.icons8.com/color/48/tractor.png" alt="logo" class="logo-icon" />
+          <div class="logo-name">助农服务平台</div>
+        </div>
+
+        <div class="header-center">
+          <el-input
+            v-model="search"
+            placeholder="搜索 农产品 / 服务 / 产地"
+            clearable
+            class="search-input"
+          >
+            <template #append>
+              <el-button type="primary" @click="handleSearch">搜索</el-button>
+            </template>
+          </el-input>
+        </div>
+
+        <div class="header-right">
+          <el-badge :value="cartCount" class="cart-badge">
+            <el-button type="text" @click="goToCart">
+              🛒 购物车
+            </el-button>
+          </el-badge>
+
+          <el-button type="text" @click="goToOrders">📦 我的订单</el-button>
+          
+          <el-dropdown>
+            <span class="el-dropdown-link">
+              <img :src="user.avatar" class="avatar" alt="用户头像" />
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item disabled>👤 {{ user.username }}</el-dropdown-item>
+                <el-dropdown-item @click="goToProfile">个人中心</el-dropdown-item>
+                <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </el-header>
 
-      <el-main>
-        <!-- Hero -->
-        <section class="hero">
-          <div class="hero-left">
-            <h1>为乡村振兴赋能 — 智能、可靠的助农服务</h1>
-            <p>一站式技术指导、订单对接、金融支持与培训，帮助农户提升产量与收益。</p>
-            <div class="hero-actions">
-              <el-button type="primary" @click="$router.push({ name: 'Services' })">了解服务</el-button>
-              <el-button @click="$router.push({ name: 'Market' })">进入集市</el-button>
+      <!-- 主体内容 -->
+      <el-main class="main-content">
+        <!-- 轮播图 -->
+        <el-carousel height="380px" indicator-position="outside" class="banner">
+          <el-carousel-item v-for="item in banners" :key="item.id">
+            <div class="banner-wrapper">
+              <img :src="item.image" class="banner-img" />
+              <div class="banner-text">{{ item.title }}</div>
             </div>
-          </div>
-          <div class="hero-right">
-            <el-card class="hero-card">
-              <div class="card-title">快速发布供求</div>
-              <el-input placeholder="填写产品/求购信息"></el-input>
-              <div class="card-actions">
-                <el-button type="primary">发布供给</el-button>
-                <el-button>发布求购</el-button>
-              </div>
-            </el-card>
-          </div>
-        </section>
+          </el-carousel-item>
+        </el-carousel>
 
-        <!-- Features -->
-        <section class="features">
-          <el-row :gutter="20">
-            <el-col :span="6" v-for="f in features" :key="f.id">
-              <el-card shadow="hover" class="feature-card" @click="openService(f.id)">
-                <div class="feature-icon">{{ f.icon }}</div>
-                <div class="feature-title">{{ f.title }}</div>
-                <div class="feature-desc">{{ f.desc }}</div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </section>
+        <!-- 分类导航 -->
+       <div class="category-section">
+          <div class="category-row">
+            <div class="section-title">🍀 农产品分类</div>
+                <div class="category-list">
+                <button
+                    v-for="(item, index) in categories"
+                    :key="index"
+                    class="category-chip"
+                    :class="{ active: activeCategory === item.name }"
+                    @click="handleCategoryClick(item.name)"
+                    :title="item.name"
+                >
+                    <img :src="item.icon" alt="" class="category-icon" />
+                    <span class="category-text">{{ item.name }}</span>
+                </button>
+                </div>
+            </div>
+        </div>
 
-        <!-- Market -->
-        <section class="market">
-          <h3>乡村集市推荐</h3>
-          <el-row :gutter="20">
-            <el-col :span="6" v-for="item in marketItems" :key="item.id">
-              <el-card class="product-card" shadow="always" @click="viewProduct(item)">
-                <div class="img-placeholder">图片</div>
-                <div class="product-title">{{ item.title }}</div>
-                <div class="product-meta">
-                  <span class="price">{{ item.price }}</span>
-                  <el-button type="text" size="small">查看</el-button>
+        <!-- 商品展示区 -->
+        <div class="showcase-section">
+          <h2 class="section-title">🌾 展示区 - {{ activeCategory }}</h2>
+          <el-row :gutter="24" justify="display-grid">
+            <el-col
+              v-for="item in filteredProducts"
+              :key="item.id"
+              :xs="12" :sm="8" :md="6" :lg="4"
+            >
+              <el-card shadow="hover" class="product-card">
+                <img :src="item.image" class="product-img" />
+                <div class="info">
+                  <p class="name">{{ item.name }}</p>
+                  <p class="price">￥{{ item.price }}</p>
+                  <el-button type="success" size="small" @click="addToCart(item)">加入购物车</el-button>
                 </div>
               </el-card>
             </el-col>
           </el-row>
-        </section>
-
-        <!-- News -->
-        <section class="news">
-          <h3>最新资讯</h3>
-          <el-timeline>
-            <el-timeline-item v-for="n in news" :key="n.id" :timestamp="n.date">
-              <a class="news-link" @click.prevent="viewNews(n)">{{ n.title }}</a>
-            </el-timeline-item>
-          </el-timeline>
-        </section>
+        </div>
       </el-main>
 
-      <el-footer class="site-footer">
-        <div>© 2025 助农服务平台 · 联系电话：400-000-000</div>
+      <el-footer class="footer">
+        <p>© 2025 助农服务平台 | 助力乡村振兴 | All Rights Reserved.</p>
       </el-footer>
     </el-container>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.home {
-  .site-header {
-    background: #fff;
-    border-bottom: 1px solid #ebeef5;
-    .header-inner {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 20px;
-      .logo {
-        font-weight: 700;
-        font-size: 18px;
+.layout {
+  background-color: #f8f8f8;
+}
+
+.header {
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  height: 70px;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    .logo-icon { width: 40px; height: 40px;}
+    .logo-name { font-size: 20px; font-weight: 600; color:#2c3e50}
+  }
+
+  .header-center { 
+    flex: 1; 
+    display: flex; 
+    justify-content: center; 
+    .search-input { width: 350px; }
+  }
+  .header-right { display: flex; align-items: center; gap: 20px; }
+
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .cart-badge {
+    .el-badge__content {
+      background-color: #67c23a;
+    }
+  }
+}
+
+.main-content {
+    padding: 0 40px 40px;
+
+    .banner {
+      margin: 20px 0;
+      border-radius: 10px;
+      overflow: hidden;
+
+      .banner-wrapper {
+        position: relative;
       }
-      .header-actions {
+
+      .banner-img {
+        width: 100%;
+        height: 380px;
+        object-fit: cover;
+        filter: brightness(85%);
+      }
+
+      .banner-text {
+        position: absolute;
+        bottom: 20px;
+        left: 40px;
+        color: white;
+        font-size: 24px;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
+      }
+    }
+
+    /* 分类区样式 */
+    .category-section {
+      padding: 12px 0;
+      .category-row{
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap:16px;
+      }
+      .section-title {
+        font-size: 18px;
+        color: #2b5d34;
+        margin-bottom: 10px;
+        white-space: nowrap;
+      }
+
+      .category-list {
+        display: flex;
         gap: 10px;
-        .search-input {
-          width: 420px;
+        align-items: center;
+        overflow-x:auto;
+        padding: 6px 10px;
+        scrollbar-width: none;
+      }
+
+      .category-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #fff;
+        border:1px solid #ebeef5;
+        border-radius: 20px;
+        padding: 6px 10px;
+        cursor: pointer;
+        transition: all 0.18s;
+        min-width: 80px;
+
+        &:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .category-icon {
+          width: 28px;
+          height: 28px;
+
+        }
+
+        .category-text {
+          font-size: 14px;
+          color: #333;
+        }
+      }
+
+      .category-card.active {
+        border: 2px solid #67c23a;
+        background-color: #f0f9eb;
+      }
+    }
+
+    /* 商品区样式 */
+    .showcase-section {
+      margin-top: 40px;
+
+      .section-title {
+        text-align: center;
+        font-size: 24px;
+        color: #2b5d34;
+        margin-bottom: 30px;
+      }
+
+      .product-card {
+        text-align: center;
+        border-radius: 10px;
+        overflow: hidden;
+
+        .product-img {
+          width: 120px;
+          height: 120px;
+          object-fit: cover;
+        }
+
+        .info {
+          padding: 10px 0;
+
+          .name {
+            font-weight: 500;
+            color: #333;
+            margin: 5px 0;
+          }
+
+          .price {
+            color: #e67e22;
+            font-weight: bold;
+            margin: 5px 0 10px;
+          }
         }
       }
     }
   }
 
-  .hero {
-    display: flex;
-    gap: 20px;
-    margin: 24px 0;
-    .hero-left {
-      flex: 1;
-      background: linear-gradient(90deg, #f7fbef, #ffffff);
-      padding: 30px;
-      border-radius: 6px;
-      h1 { margin: 0 0 10px; }
-      p { color: #666; margin-bottom: 16px; }
-      .hero-actions { display:flex; gap: 10px; }
-    }
-    .hero-right {
-      width: 320px;
-      .hero-card {
-        padding: 16px;
-        .card-title { font-weight: 600; margin-bottom: 10px; }
-        .card-actions { display:flex; gap:8px; margin-top:10px; }
-      }
-    }
-  }
-
-  .features { margin-bottom: 24px;
-    .feature-card {
-      text-align: center;
-      .feature-icon { font-size: 28px; margin-bottom: 8px; }
-      .feature-title { font-weight: 600; }
-      .feature-desc { color: #888; font-size: 12px; margin-top: 6px; }
-      cursor: pointer;
-    }
-  }
-
-  .market { margin-bottom: 24px;
-    h3 { margin-bottom: 12px; }
-    .product-card {
-      cursor: pointer;
-      .img-placeholder {
-        height: 120px;
-        background: #f5f7fa;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        color:#999;
-        margin-bottom: 10px;
-      }
-      .product-title { font-weight: 600; margin-bottom: 6px; }
-      .product-meta { display:flex; justify-content:space-between; align-items:center; }
-      .price { color:#f56c6c; font-weight:700; }
-    }
-  }
-
-  .news { margin-bottom: 24px;
-    h3 { margin-bottom: 12px; }
-    .news-link { color: #409eff; cursor: pointer; }
-  }
-
-  .site-footer {
+  .el-footer {
+    background-color: #f5f5f5;
     text-align: center;
-    padding: 12px 0;
-    color: #999;
-    border-top: 1px solid #ebeef5;
+    padding: 15px 0;
+    font-size: 14px;
+    color: #777;
+    border-top: 1px solid #eaeaea;
   }
-}
-
-/* 响应式 */
-@media (max-width: 900px) {
-  .home .hero { flex-direction: column; }
-  .home .header-inner .search-input { width: 220px; }
-}
 </style>
-// ...existing code...
