@@ -1,60 +1,184 @@
 <script lang="ts" setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+
+import banner1 from '@/assets/images/banner1.jpg'
+import banner2 from '@/assets/images/banner2.jpg'
+import banner3 from '@/assets/images/banner3.jpg'
 
 const router = useRouter()
 const search = ref('')
 
-// 模拟轮播图数据
-const banners = ref([
-  { id: 1, image: 'https://picsum.photos/seed/farm1/1200/400', title: '绿色助农 · 共建美好乡村' },
-  { id: 2, image: 'https://picsum.photos/seed/farm2/1200/400', title: '科技赋能农业现代化' },
-  { id: 3, image: 'https://picsum.photos/seed/farm3/1200/400', title: '优质农品 · 来自田间地头' },
-])
-
-// 模拟分类数据
-const categories = ref([
-  { id: 0, name: '全部', icon: 'https://img.icons8.com/color/48/select-all.png' },
-  { id: 1, name: '粮油副食', icon: 'https://img.icons8.com/color/48/wheat.png' },
-  { id: 2, name: '新鲜果蔬', icon: 'https://img.icons8.com/color/48/apple.png' },
-  { id: 3, name: '农用工具', icon: 'https://img.icons8.com/color/48/shovel.png' },
-  { id: 4, name: '畜牧产品', icon: 'https://img.icons8.com/color/48/cow.png' },
-  { id: 5, name: '手工特产', icon: 'https://img.icons8.com/color/48/handmade.png' },
-])
-
-// 模拟商品数据
-const products = ref([
-  { id: 1, name: '生态大米', price: 56.8, image: 'https://picsum.photos/seed/rice/280/200', category: '粮油副食' },
-  { id: 2, name: '有机苹果', price: 29.9, image: 'https://picsum.photos/seed/apple/280/200', category: '新鲜果蔬' },
-  { id: 3, name: '绿色蔬菜', price: 8.5, image: 'https://picsum.photos/seed/veg/280/200', category: '新鲜果蔬' },
-  { id: 4, name: '纯天然蜂蜜', price: 69.0, image: 'https://picsum.photos/seed/honey/280/200', category: '手工特产' },
-  { id: 5, name: '优质玉米', price: 18.5, image: 'https://picsum.photos/seed/corn/280/200', category: '粮油副食' },
-  { id: 6, name: '农用铁锹', price: 89.9, image: 'https://picsum.photos/seed/shovel/280/200', category: '农用工具' },
-  { id: 7, name: '牧场牛奶', price: 12.8, image: 'https://picsum.photos/seed/milk/280/200', category: '畜牧产品' },
-])
-
-// 当前选中的分类
-const activeCategory = ref('全部')
-
-// 根据选中的分类动态过滤商品
-const filteredProducts = computed(() => {
-  if (activeCategory.value === '全部') {
-    return products.value
-  } else {
-    return products.value.filter(p => p.category === activeCategory.value)
-  }
-})
-
-// 分类点击事件
-function handleCategoryClick(name: string) {
-  activeCategory.value = name
+// ======================== 数据接口定义 ========================
+interface Category {
+  id: number
+  name: string
+  icon: string
 }
 
-// 搜索功能
+interface Product {
+  id: number
+  name: string
+  price: number
+  image_url: string
+  categoryId: number
+  status?: string
+}
+
+interface Announcement {
+  id: number
+  title: string
+  content: string
+  createTime: string
+  publisherId: number 
+  status: string
+}
+
+// ======================== 静态轮播图 ========================
+const banners = ref([
+  { id: 1, image: banner1, title: '绿色助农 · 共建美好乡村' },
+  { id: 2, image: banner2, title: '科技赋能农业现代化' },
+  { id: 3, image: banner3, title: '优质农品 · 来自田间地头' },
+])
+
+//响应式数据
+const categories = ref<Category[]>([])
+const products = ref<Product[]>([])
+const announcements = ref<Announcement[]>([])
+const loading = ref(false)
+const activeCategoryId = ref<number>(0)
+
+const availableProducts = computed(() => {
+  return products.value.filter(product => product.status === '已上架')
+})
+
+//分类筛选 
+const filteredProducts = computed(() => {
+  if (activeCategoryId.value === 0) return availableProducts.value
+  return availableProducts.value.filter(p => p.categoryId === activeCategoryId.value)
+})
+
+
+// ======================== 已发布的公告 ========================
+const publishedAnnouncements = computed(() => {
+  return announcements.value.filter(announcement => announcement.status === '已发布')
+})
+
+const handleCategoryClick = (categoryId: number) => {
+  activeCategoryId.value = categoryId
+}
+
+// ======================== 获取商品和分类数据 ========================
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const [categoryRes, productRes] = await Promise.all([
+      fetch('http://localhost:8080/category/list'),
+      fetch('http://localhost:8080/product/list')
+    ])
+
+    const categoryData = await categoryRes.json()
+    const productData = await productRes.json()
+
+    console.log('完整的商品API响应:', productData) // 查看完整响应结构
+    console.log('商品数据:', productData.data || productData) // 查看实际数据
+
+    categories.value = [
+      { id: 0, name: '全部', icon: 'https://img.icons8.com/color/48/select-all.png' },
+      ...(categoryData.data || categoryData)
+    ]
+
+    products.value = (productData.data || productData).map((p: { id: number; name: string; price: number; imageUrl?: string; image?: string; img_url?: string; categoryId?: number; category_id?: number; status?: string }) => {
+      // 尝试不同的图片字段名
+      const imageField = p.imageUrl || p.image || p.img_url
+
+      console.log(`商品 ${p.name} 的图片字段:`, {
+        imageUrl: p.imageUrl,
+        foundField: imageField
+      })
+      
+      let imageUrl = 'https://via.placeholder.com/200'
+      
+      if (imageField) {
+        if (imageField.startsWith('http')) {
+          imageUrl = imageField
+        } else {
+          const path = imageField.startsWith('/') ? imageField : `/${imageField}`
+          imageUrl = `http://localhost:8080${path}`
+        }
+      }
+      
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        image_url: imageUrl,
+        categoryId: p.categoryId || p.category_id,
+        status: p.status
+      }
+    })
+    
+  } catch (error) {
+    console.error('加载失败:', error)
+    ElMessage.error('数据加载失败，请刷新重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+// ======================== 获取公告数据 ========================
+const fetchAnnouncements = async () => {
+  try {
+    const response = await fetch('http://localhost:8080/announcement/list')
+    if (!response.ok) {
+      throw new Error('获取公告失败')
+    }
+    const result = await response.json()
+    // 获取所有公告，前端进行状态过滤
+    announcements.value = result.data || result || []
+  } catch (error) {
+    console.error('获取公告失败:', error)
+    announcements.value = []
+  }
+}
+
+// ======================== 搜索功能 ========================
 function handleSearch() {
   if (!search.value.trim()) return
   router.push({ name: 'Search', query: { q: search.value } }).catch(() => {})
 }
+
+// ======================== 页面跳转 ========================
+const goToLogin = () => {
+  router.push('/login')
+}
+
+const goToRegister = () => {
+  router.push('/register')
+}
+
+// ======================== 格式化日期 ========================
+const formatDate = (dateString: string) => {
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return dateString
+  }
+}
+
+// ======================== 页面加载 ========================
+onMounted(async () => {
+  await fetchData()
+  await fetchAnnouncements()
+})
 </script>
 
 <template>
@@ -68,24 +192,23 @@ function handleSearch() {
           <div class="logo-name">助农服务平台</div>
         </div>
 
-        <el-menu class="nav-menu" mode="horizontal" background-color="transparent">
-          <el-menu-item index="1">商品</el-menu-item>
-          <el-menu-item index="2">资讯</el-menu-item>
-          <el-menu-item index="3">公告</el-menu-item>
-        </el-menu>
-
-        <div class="header-right">
+        <div class="header-center">
           <el-input
             v-model="search"
             placeholder="搜索 农产品 / 服务 / 产地"
             clearable
             class="search-input"
+            @keyup.enter="handleSearch"
           >
             <template #append>
               <el-button type="primary" @click="handleSearch">搜索</el-button>
             </template>
           </el-input>
-          <el-button type="text" @click="$router.push({ name: 'Login' })">登录</el-button>
+        </div>
+
+        <div class="header-right">
+          <el-button type="text" @click="goToLogin" plain>登录</el-button>
+          <el-button type="text" @click="goToRegister" plain>注册</el-button>
         </div>
       </el-header>
 
@@ -103,36 +226,47 @@ function handleSearch() {
         </el-carousel>
 
         <!-- 分类导航 -->
-       <div class="category-section">
+        <div class="category-section">
           <div class="category-row">
             <div class="section-title">🍀 农产品分类</div>
-                <div class="category-list">
-                <button
-                    v-for="(item, index) in categories"
-                    :key="index"
-                    class="category-chip"
-                    :class="{ active: activeCategory === item.name }"
-                    @click="handleCategoryClick(item.name)"
-                    :title="item.name"
-                >
-                    <img :src="item.icon" alt="" class="category-icon" />
-                    <span class="category-text">{{ item.name }}</span>
-                </button>
-                </div>
+            <div class="category-list">
+              <button
+                v-for="item in categories"
+                :key="item.id"
+                class="category-chip"
+                :class="{ active: activeCategoryId === item.id }"
+                @click="handleCategoryClick(item.id)"
+                :title="item.name"
+              >
+                <span class="category-text">{{ item.name }}</span>
+              </button>
             </div>
+          </div>
         </div>
 
         <!-- 商品展示区 -->
         <div class="showcase-section">
-          <h2 class="section-title">🌾 展示区 - {{ activeCategory }}</h2>
-          <el-row :gutter="24" justify="display-grid">
+          <h2 class="section-title">🌾 商品展示 - {{ activeCategoryId === 0 ? '全部商品' : categories.find(c => c.id === activeCategoryId)?.name }}</h2>
+          
+          <div class="status-info">
+            <span class="total-count">共 {{ availableProducts.length }} 件已上架商品</span>
+          </div>
+
+          <div v-if="loading" class="loading">
+            <el-icon size="48" class="is-loading"><Loading /></el-icon>
+            <p>数据加载中...</p>
+          </div>
+
+          <el-empty v-else-if="filteredProducts.length === 0" description="暂无该分类的商品" />
+
+          <el-row v-else :gutter="24" justify="start">
             <el-col
-              v-for="(item, index) in filteredProducts"
-              :key="index"
+              v-for="item in filteredProducts"
+              :key="item.id"
               :xs="12" :sm="8" :md="6" :lg="4"
             >
               <el-card shadow="hover" class="product-card">
-                <img :src="item.image" class="product-img" />
+                <img :src="item.image_url" class="product-img" />
                 <div class="info">
                   <p class="name">{{ item.name }}</p>
                   <p class="price">￥{{ item.price }}</p>
@@ -142,6 +276,33 @@ function handleSearch() {
             </el-col>
           </el-row>
         </div>
+
+        <!-- 公告展示区 -->
+        <div class="announcement-section">
+          <h2 class="section-title">平台公告</h2>
+          <el-card class="announcement-card">
+            <div v-if="publishedAnnouncements.length === 0" class="empty-announcement">
+              <p>暂无公告</p>
+            </div>
+            <div v-else class="announcement-list">
+              <div 
+                v-for="announcement in publishedAnnouncements" 
+                :key="announcement.id"
+                class="announcement-item"
+              >
+                <div class="announcement-header">
+                  <h3 class="announcement-title">{{ announcement.title }}</h3>
+                  <span class="announcement-time">{{ formatDate(announcement.createTime) }}</span>
+                </div>
+                <p class="announcement-content">{{ announcement.content }}</p>
+                <div class="announcement-footer">
+                  <span class="announcement-publisher">发布者：{{ announcement.publisherId }}</span>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </div>
+
       </el-main>
 
       <!-- 页脚 -->
@@ -182,19 +343,13 @@ function handleSearch() {
       }
     }
 
-    .nav-menu {
+    .header-center {
       flex: 1;
       display: flex;
       justify-content: center;
-      border-bottom: none;
-
-      .el-menu-item {
-        font-size: 16px;
-        font-weight: 500;
-        color: #555;
-        &:hover {
-          color: #409eff;
-        }
+      
+      .search-input {
+        width: 400px;
       }
     }
 
@@ -202,10 +357,6 @@ function handleSearch() {
       display: flex;
       align-items: center;
       gap: 15px;
-
-      .search-input {
-        width: 350px;
-      }
     }
   }
 
@@ -280,21 +431,15 @@ function handleSearch() {
           box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
 
-        .category-icon {
-          width: 28px;
-          height: 28px;
-
+        &.active {
+          border-color: #67c23a;
+          background-color: #f0f9eb;
         }
-
         .category-text {
+          flex-grow: 1;
           font-size: 14px;
           color: #333;
         }
-      }
-
-      .category-card.active {
-        border: 2px solid #67c23a;
-        background-color: #f0f9eb;
       }
     }
 
@@ -309,13 +454,36 @@ function handleSearch() {
         margin-bottom: 30px;
       }
 
+      .status-info {
+        text-align: center;
+        margin-bottom: 20px;
+        .total-count {
+          color: #666;
+          font-size: 14px;
+          background: #f0f9eb;
+          padding: 6px 12px;
+          border: 1px #67c23a;
+        }
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px 0;
+        
+        p {
+          margin-top: 16px;
+          color: #666;
+        }
+      }
+
       .product-card {
         text-align: center;
         border-radius: 10px;
         overflow: hidden;
+        margin-bottom: 20px;
 
         .product-img {
-          width: 120px;
+          width: 100%;
           height: 120px;
           object-fit: cover;
         }
@@ -337,6 +505,74 @@ function handleSearch() {
         }
       }
     }
+
+    /* 公告区样式 */
+    .announcement-section {
+      margin-top: 50px;
+
+      .section-title {
+        text-align: center;
+        font-size: 24px;
+        color: #2b5d34;
+        margin-bottom: 20px;
+      }
+
+      .announcement-card {
+        border-radius: 10px;
+        padding: 20px;
+      }
+
+      .empty-announcement {
+        text-align: center;
+        padding: 40px 0;
+        color: #999;
+      }
+
+      .announcement-list {
+        .announcement-item {
+          padding: 16px 0;
+          border-bottom: 1px solid #f0f0f0;
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          .announcement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+
+            .announcement-title {
+              font-size: 16px;
+              font-weight: 600;
+              color: #333;
+              margin: 0;
+            }
+
+            .announcement-time {
+              font-size: 12px;
+              color: #999;
+            }
+          }
+
+          .announcement-content {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 8px;
+          }
+
+          .announcement-footer {
+            text-align: right;
+
+            .announcement-publisher {
+              font-size: 12px;
+              color: #999;
+            }
+          }
+        }
+      }
+    }
   }
 
   .el-footer {
@@ -347,5 +583,18 @@ function handleSearch() {
     color: #777;
     border-top: 1px solid #eaeaea;
   }
+}
+
+@keyframes rotating {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.is-loading {
+  animation: rotating 2s linear infinite;
 }
 </style>

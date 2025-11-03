@@ -1,118 +1,233 @@
 <script lang="ts" setup>
-import { ref, reactive, onMounted } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import request from '@/utils/request'
+import { ElMessage, ElMessageBox } from 'element-plus';
+import {ref, reactive, onMounted } from 'vue';
 
-// ✅ 模拟后台返回的商品类别数据
+const categoryForm = reactive({
+  ID: 0,
+  name: '',
+  description: ''
+})
+
 interface Category {
   id: number;
   name: string;
   description: string;
 }
 
-const categoryList = ref<Category[]>([]);
-const dialogVisible = ref(false);
-const dialogTitle = ref("新增类别");
-
-// 当前编辑的类别对象
-const form = reactive<Category>({
-  id: 0,
-  name: "",
-  description: "",
-});
-
-// 模拟加载数据
-const loadCategories = () => {
-  categoryList.value = [
-    { id: 1, name: "蔬菜类", description: "新鲜蔬菜" },
-    { id: 2, name: "水果类", description: "时令水果" },
-    { id: 3, name: "粮油类", description: "粮食与食用油" },
-    { id: 4, name: "农资类", description: "农药、化肥、农具等" },
-  ];
+//重置表单
+const resetForm = () => {
+  categoryForm.ID = 0;
+  categoryForm.name = '';
+  categoryForm.description = '';
 };
 
-// 打开新增弹窗
-const handleAdd = () => {
-  dialogTitle.value = "新增类别";
-  form.id = 0;
-  form.name = "";
-  form.description = "";
-  dialogVisible.value = true;
-};
-
-// 打开编辑弹窗
-const handleEdit = (row: Category) => {
-  dialogTitle.value = "编辑类别";
-  form.id = row.id;
-  form.name = row.name;
-  form.description = row.description;
-  dialogVisible.value = true;
-};
-
-// 保存类别（新增或编辑）
-const handleSave = () => {
-  if (!form.name.trim()) {
-    ElMessage.warning("类别名称不能为空");
-    return;
-  }
-  if (form.id === 0) {
-    // 新增
-    const newId = categoryList.value.length + 1;
-    categoryList.value.push({
-      id: newId,
-      name: form.name,
-      description: form.description,
-    });
-    ElMessage.success("新增成功");
-  } else {
-    // 修改
-    const index = categoryList.value.findIndex((c) => c.id === form.id);
-    if (index !== -1) {
-      const item = categoryList.value[index];
-      if (item) {
-        item.name = form.name;
-        item.description = form.description;
-        ElMessage.success("修改成功");
+// 查看全部类别
+const categorys = ref<Category[]>([]);
+const fetchCategories = async () => {
+  try {
+    const response = await fetch('http://localhost:8080/category/list',{
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       }
+    })
+    if(!response.ok){
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const data = await response.json();
+    categorys.value = data;
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    categorys.value = [];
   }
-  dialogVisible.value = false;
+}
+const debugShowResponse = (label: string, response: unknown) => {
+  console.log(`${label}:`, response);
+};
+
+// 添加类别
+const openAddDialog = () => {
+  dialogTitle.value = '添加类别';
+  resetForm(); 
+  dialogVisible.value = true;
+};
+
+const loading = ref(false);
+const dialogVisible = ref(false);
+const dialogTitle = ref('添加类别');
+
+const handleAdd = async () => {
+  try {
+    loading.value = true;
+    const response = await request.post('/category/add', {
+      name: categoryForm.name,
+      description: categoryForm.description
+    });
+
+    debugShowResponse('add response', response);
+    const resp = response;
+    const payload = resp?.data ?? resp; 
+    const maybeOk =
+      payload === true ||
+      payload === 'true' ||
+      payload?.data === true ||
+      payload?.success === true ||
+      payload?.ok === true ||
+      payload?.result === true ||
+      payload?.code === 200 ||
+      resp?.status === 200;
+
+    if (maybeOk) {
+      ElMessage.success('类别添加成功');
+      dialogVisible.value = false; 
+      resetForm();
+      await fetchCategories(); 
+    } else {
+      ElMessage.error('添加失败' );
+    }
+  } catch (error) {
+    console.error('Error adding category:', error);
+    ElMessage.error('添加失败,请重试');
+  } finally {
+    loading.value = false;
+  }
+};
+
+
+// 修改类别
+const openEditDialog = (category: Category) => {
+  dialogTitle.value = '修改类别';
+  Object.assign(categoryForm, {
+    ID: category.id,
+    name: category.name,
+    description: category.description
+  });
+  dialogVisible.value = true;
+};
+
+const handleEdit = async () => {
+  try {
+    loading.value = true;
+    const response = await request.put(`/category/update/${categoryForm.ID}`, {
+      name: categoryForm.name,
+      description: categoryForm.description
+    });
+
+    debugShowResponse('edit response', response);
+
+    const resp = response;
+    const payload = resp?.data ?? resp;
+    const maybeOk =
+      payload === true ||
+      payload === 'true' ||
+      payload?.data === true ||
+      payload?.success === true ||
+      payload?.ok === true ||
+      payload?.result === true ||
+      payload?.code === 200 ||
+      resp?.status === 200;
+
+    if (maybeOk) {
+      ElMessage.success('类别修改成功');
+      dialogVisible.value = false; 
+      resetForm();
+      await fetchCategories();
+    } else {
+      ElMessage.error('修改失败');
+    }
+  } catch (error) {
+    console.error('修改错误:', error);
+    ElMessage.error('修改失败');
+  } finally {
+    loading.value = false;
+  }
 };
 
 // 删除类别
-const handleDelete = (row: Category) => {
-  ElMessageBox.confirm(`确定要删除 "${row.name}" 吗？`, "提示", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  })
-    .then(() => {
-      categoryList.value = categoryList.value.filter((c) => c.id !== row.id);
-      ElMessage.success("删除成功");
-    })
-    .catch(() => {
-      ElMessage.info("已取消操作");
-    });
+const handleDelete = async (category: Category) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除类别 "${category.name}" 吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+
+    const response = await request.delete(`/category/delete/${category.id}`);
+    debugShowResponse('delete response', response);
+    const payload = response?.data ?? response;
+    const maybeOk =
+      payload === true ||
+      payload === 'true' ||
+      payload?.data === true ||
+      payload?.success === true ||
+      payload?.ok === true ||
+      payload?.result === true ||
+      payload?.code === 200 ||
+      response?.status === 200;
+    if (maybeOk) {
+      ElMessage.success('类别删除成功');  
+      await fetchCategories();
+    } else {
+      ElMessage.error('删除失败');
+    }
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    ElMessage.error('删除失败，请重试');
+  }
+};
+
+
+//保存按钮
+const handleSave = async () => {
+  loading.value = true;
+  try{
+    if(categoryForm.ID){
+      await handleEdit();
+    } else {
+      await handleAdd();
+    }
+  }catch (error) {
+    ElMessage.error('保存失败');
+    console.error('保存错误:', error);
+  } finally {
+    loading.value = false;
+  }
 };
 
 onMounted(() => {
-  loadCategories();
+  fetchCategories();
 });
+
 </script>
 
 <template>
   <div class="category-manage">
     <div class="header">
       <h2>🗂️ 商品类别</h2>
-      <el-button type="primary" @click="handleAdd">新增类别</el-button>
+      <el-button type="primary" @click="openAddDialog">新增类别</el-button>
     </div>
 
-    <el-table :data="categoryList" border stripe style="width: 100%">
+    <el-alert 
+      :title="`当前共有 ${categorys.length} 个类别`" 
+      type="info"
+      :closable="false"
+      show-icon
+      class="category-alert"
+    />
+
+    <el-table :data="categorys" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="类别名称" />
       <el-table-column prop="description" label="描述" />
       <el-table-column label="操作" width="180">
         <template #default="{ row }">
-          <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+          <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -121,11 +236,11 @@ onMounted(() => {
     <!-- 弹窗表单 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="400px">
       <el-form label-width="80px">
-        <el-form-item label="类别名称">
-          <el-input v-model="form.name" placeholder="请输入类别名称" />
+        <el-form-item label="类别名称" required>
+          <el-input v-model="categoryForm.name" placeholder="请输入类别名称" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="form.description" placeholder="请输入描述信息" />
+          <el-input v-model="categoryForm.description" placeholder="请输入描述信息" type="textarea" />
         </el-form-item>
       </el-form>
 
@@ -139,18 +254,33 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .category-manage {
-  padding: 20px;
+  padding: 24px;
   background-color: #fff;
   border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     h2 {
+      margin:0;
+      font-size: 22px;
       font-weight: 600;
       color: #333;
+    }
+  }
+
+    .category-alert {
+    margin: 10px 0 20px;
+    border-radius: 8px;
+    border: 1px solid #e0ebff;
+    font-weight: 500;
+
+    :deep(.el-alert__title) {
+      font-size: 15px;
+      line-height: 1.6;
     }
   }
 

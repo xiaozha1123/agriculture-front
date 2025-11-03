@@ -1,12 +1,65 @@
 <script lang="ts" setup>
 import router from '@/router';
-import { ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { onMounted, ref } from 'vue';
 
 const isCollapse = ref(false);
+const username = ref(''); // 用户名
+const dropdownVisible = ref(false); // 下拉菜单显示状态
+
+// 获取用户信息
+const getUsername = () => {
+  const sessionUser = sessionStorage.getItem('username');
+  if (sessionUser) {
+    username.value = sessionUser;
+  }
+};
+
+// 退出登录
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    });
+    // 退出登录逻辑
+    localStorage.removeItem('userInfo');
+    sessionStorage.removeItem('userInfo');
+    
+    ElMessage.success('退出成功');
+    
+    router.push('/');
+  } catch {
+    console.log('取消退出');
+  }
+};
+
+// 切换下拉菜单
+const toggleDropdown = () => {
+  dropdownVisible.value = !dropdownVisible.value;
+};
+
+// 点击其他地方关闭下拉菜单
+const closeDropdown = (event: Event) => {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.user-dropdown')) {
+    dropdownVisible.value = false;
+  }
+};
 
 const goHome = () => {
     router.push('/farmer');
 }
+
+const handleApply = () => {
+    router.push({ path: '/apply', query: { username: username.value } });
+}
+
+onMounted(() => {
+  getUsername();
+  document.addEventListener('click', closeDropdown);
+});
 
 </script>
 
@@ -19,7 +72,30 @@ const goHome = () => {
                     <div class="logo-name" @click="goHome">商家中心</div>
                 </div>
                 <div class="header-right">
-                    <el-button size="small">退出登录</el-button>
+                    <div class="user-info user-dropdown" @click="toggleDropdown">
+                        <div class="user-avatar">
+                            <el-avatar :size="32" :src="''">
+                                {{ username ? username.charAt(0).toUpperCase() : 'U' }}
+                            </el-avatar>
+                        </div>
+                        <span class="username">{{ username }}</span>
+                        <el-icon class="dropdown-arrow">
+                            <IEpArrowDown />
+                        </el-icon>
+
+                        <transition name="el-zoom-in-top">
+                            <div v-show="dropdownVisible" class="dropdown-menu">
+                                <div class="dropdown-item apply" @click="handleApply">
+                                    <el-icon><IEpShop /></el-icon>
+                                    <span>申请商铺</span>
+                                </div>
+                                <div class="dropdown-item logout" @click="handleLogout">
+                                    <el-icon><IEpSwitchButton /></el-icon>
+                                    <span>退出登录</span>
+                                </div>
+                            </div>
+                        </transition>
+                    </div>
                 </div>
             </el-header>
 
@@ -101,6 +177,79 @@ const goHome = () => {
             display: flex;
             align-items: center;
             gap: 12px;
+            .user-info {
+                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: background-color 0.3s;
+
+                &:hover {
+                background-color: #f5f5f5;
+                }
+
+                .user-avatar {
+                display: flex;
+                align-items: center;
+                }
+
+                .username {
+                font-size: 14px;
+                color: #333;
+                font-weight: 500;
+                }
+
+                .dropdown-arrow {
+                color: #666;
+                transition: transform 0.3s;
+                }
+
+                &:hover .dropdown-arrow {
+                transform: rotate(180deg);
+                }
+
+                .dropdown-menu {
+                position: absolute;
+                top: 100%;
+                right: 0;
+                width: 120px;
+                background: #fff;
+                border: 1px solid #e4e7ed;
+                border-radius: 4px;
+                box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+                margin-top: 4px;
+
+                .dropdown-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 12px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                    font-size: 14px;
+
+                    &:hover {
+                    background-color: #f5f7fa;
+                    }
+
+                    &.apply {
+                    color: #409eff;
+                    }
+
+                    &.logout {
+                    color: #f56c6c;
+
+                    &:hover {
+                        background-color: #fef0f0;
+                    }
+                    }
+                }
+                }
+            }
         }
     }
     .el-aside{

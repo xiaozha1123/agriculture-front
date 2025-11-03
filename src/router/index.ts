@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import homePage from '@/views/homePage.vue'
+import HomePage from '@/views/homePage.vue'
 import TestPage from '@/views/TestPage.vue'
 
 const router = createRouter({
@@ -8,7 +8,23 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: homePage,
+      component: HomePage,
+    },
+    {
+      path:'/login',
+      name:'Login',
+      component: () => import('@/views/LoginPage.vue')
+    },
+    {
+      path:'/register',
+      name:'Register',
+      component: () => import('@/views/RegisterPage.vue')
+    },
+    {
+      path:'/apply',
+      name:'ApplyShop',
+      component: () => import('@/views/farmer/ApplyShop.vue'),
+      meta: { requiresAuth: false }
     },
     {
       path:'/test',
@@ -29,6 +45,10 @@ const router = createRouter({
         {
           path:'orders',
           component: () => import('@/views/customer/OrderPage.vue')
+        },
+        {
+          path:'comment',
+          component: () => import('@/views/customer/CommentPage.vue')
         },
         {
           path:'profile',
@@ -59,7 +79,7 @@ const router = createRouter({
         {
           path:'profile',
           component: () => import('@/views/farmer/ProfileFarmer.vue')
-        }
+        },
       ]
     },
     {

@@ -4,100 +4,130 @@ import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
 
 const router = useRouter()
-const loginForm = ref<FormInstance>()
+const registerForm = ref<FormInstance>()
 
-const form = reactive({
+// ✅ 类型定义
+interface RegisterForm {
+  username: string
+  password: string
+  confirmPassword: string
+  role: string
+  phone: string
+}
+
+const form = reactive<RegisterForm>({
   username: '',
   password: '',
-  role: '' // 选中的角色
+  confirmPassword: '',
+  role: '',
+  phone: ''
 })
 
+// ✅ 表单验证规则
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    {
+      validator: (_: unknown, value: string, callback: (error?: Error) => void) => {
+        if (value !== form.password) {
+          callback(new Error('两次密码不一致'))
+        } else callback()
+      },
+      trigger: 'blur'
+    }
+  ],
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+  ]
 }
 
 const roles = [
   { label: '管理员', value: '管理员' },
   { label: '商家', value: '商家' },
-  { label: '顾客', value: '顾客'}
+  { label: '顾客', value: '顾客' }
 ]
 
-// ✅ 核心：点击切换选择/取消选择
 const selectRole = (value: string) => {
-  // 如果点击已选中的角色，则取消选择；否则选择新角色
   form.role = form.role === value ? '' : value
 }
 
-// ✅ 计算属性：判断是否已选择角色
 const hasSelectedRole = computed(() => form.role !== '')
 
-// ✅ 清除选择
 const clearRole = () => {
   form.role = ''
 }
 
+// ✅ 核心修复：正确的请求URL和数据格式
 const onSubmit = async () => {
-  if (!loginForm.value) return
-
-  const valid = await loginForm.value.validate()
+  if (!registerForm.value) return
+  
+  const valid = await registerForm.value.validate()
   if (!valid) return
 
   try {
-    const response = await fetch('http://localhost:8080/auth/login', {
+    const response = await fetch('http://localhost:8080/register/user', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         username: form.username,
         password: form.password,
-        role: form.role
+        role: form.role,
+        phone: form.phone
       }),
       credentials: 'include'
     })
 
     const result = await response.json()
-    if(response.ok && result.code === 200) {
-      ElMessage.success('登录成功')
-      sessionStorage.setItem('username', form.username)
-      sessionStorage.setItem('role', form.role)
+    
+    if (response.ok && result.success) {
+      ElMessage.success('注册成功')
+      console.log('✅ 准备跳转，角色:', form.role) // ✅ 调试日志
       
-      // 根据角色跳转不同首页
-      switch (form.role) {
-        case '管理员':
-          router.push('/admin')
-          break
-        case '商家':
-          router.push('/farmer')
-          break
-        case '顾客':
-          router.push('/customer')
-          break
-        default:
-          router.push('/home')
+      const routeMap: Record<string, string> = {
+        '顾客': '/login',
+        '商家': '/apply',
+        '管理员': '/login'
       }
-    } 
-    else {
-      throw new Error(result.message || '登录失败')
+      
+      const targetRoute = routeMap[form.role] || '/login'
+      console.log('🚀 跳转到:', targetRoute) // ✅ 确认路由
+      
+      // ✅ 增强的跳转逻辑，捕获错误
+      await router.push(targetRoute).catch(err => {
+        console.error('❌ 路由跳转失败:', err)
+        ElMessage.error(`跳转失败: ${err.message}`)
+        // 降级处理：跳转到登录页
+        router.push('/login')
+      })
+      
+      if (form.role === '管理员') {
+        ElMessage.info('管理员账户注册后需人工审核')
+      }
+    } else {
+      throw new Error(result.message || '注册失败')
     }
   } catch (error) {
-    console.error('Login error:', error)
-    ElMessage.error('登录失败，请检查账号或网络')
+    console.error('注册错误:', error)
+    ElMessage.error(error instanceof Error ? error.message : '注册失败，请重试')
   }
 }
 </script>
 
 <template>
-  <div class="login">
+  <div class="register">
     <el-form
-      ref="loginForm"
+      ref="registerForm"
       :model="form"
       :rules="rules"
       label-width="120px"
       label-position="top"
       size="large"
     >
-      <h2>登录</h2>
+      <h2>用户注册</h2>
 
       <el-form-item label="用户名" prop="username">
         <el-input v-model="form.username" placeholder="请输入用户名" />
@@ -105,6 +135,14 @@ const onSubmit = async () => {
 
       <el-form-item label="密码" prop="password">
         <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
+      </el-form-item>
+
+      <el-form-item label="确认密码" prop="confirmPassword">
+        <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
+      </el-form-item>
+
+      <el-form-item label="手机号" prop="phone">
+        <el-input v-model="form.phone" placeholder="请输入手机号" />
       </el-form-item>
 
       <el-form-item label="角色选择" prop="role">
@@ -151,7 +189,7 @@ const onSubmit = async () => {
 
       <el-form-item>
         <el-button type="primary" @click="onSubmit" style="width: 100%">
-          登录
+          注册
         </el-button>
       </el-form-item>
     </el-form>
@@ -159,7 +197,7 @@ const onSubmit = async () => {
 </template>
 
 <style lang="scss" scoped>
-.login {
+.register {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   height: 100vh;
   display: flex;
@@ -193,8 +231,6 @@ const onSubmit = async () => {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      flex-wrap: nowrap;
-      width: 100%;
 
       .role-row {
         flex: 1;
